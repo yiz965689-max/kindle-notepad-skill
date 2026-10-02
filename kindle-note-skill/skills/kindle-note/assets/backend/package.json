@@ -1,0 +1,1 @@
+{"name":"kindle-note-backend","private":true,"type":"module","scripts":{"test":"node --test","start":"node src/server.js"},"dependencies":{"@resvg/resvg-js":"2.6.2"}}

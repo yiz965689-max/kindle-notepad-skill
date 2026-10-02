@@ -1,0 +1,10 @@
+{$SITE_HOST} {
+    reverse_proxy backend:8080 {
+        header_up X-Kindle-Client-IP {remote_host}
+    }
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy no-referrer
+        -Server
+    }
+}

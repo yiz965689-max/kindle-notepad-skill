@@ -1,0 +1,25 @@
+import {readFile,writeFile,mkdir} from 'node:fs/promises';
+import path from 'node:path';
+import {spawnSync} from 'node:child_process';
+const [instance]=process.argv.slice(2);
+if(!instance||!path.isAbsolute(instance))throw new Error('Usage: node seed-device.mjs /absolute/private-instance');
+const device=path.join(instance,'device-stage/kindle-note');
+const origin=(await readFile(path.join(device,'base-url'),'utf8')).trim();
+const u=new URL(origin);
+if(u.protocol!=='https:'||u.origin!==origin)throw new Error('Invalid HTTPS origin');
+const {DEVICE_TOKEN}=JSON.parse(await readFile(path.join(instance,'backend/secrets.json'),'utf8'));
+const response=await fetch(`${origin}/v1/screen`,{headers:{Authorization:`Bearer ${DEVICE_TOKEN}`},redirect:'error',signal:AbortSignal.timeout(45000)});
+if(!response.ok)throw new Error(`Screen request failed: ${response.status}`);
+const revision=response.headers.get('x-task-revision'),hits=response.headers.get('x-task-hits'),offset=response.headers.get('x-utc-offset');
+if(!/^\d+$/.test(revision||'')||!hits||!/^[-\d]+$/.test(offset||'')||Math.abs(Number(offset))>50400)throw new Error('Missing/invalid screen metadata');
+if(hits!=='none'&&!/^[A-Za-z0-9_,;\-]+$/.test(hits))throw new Error('Invalid hit map');
+const png=Buffer.from(await response.arrayBuffer());
+if(png.length>2097152||png.subarray(0,8).toString('hex')!=='89504e470d0a1a0a')throw new Error('Invalid screen PNG');
+// POSIX cksum matches the firmware's check; crypto hashes are not interchangeable.
+const sum=spawnSync('cksum',[],{input:png,encoding:'utf8'});
+if(sum.status!==0||!/^\d+\s+\d+/.test(sum.stdout||''))throw new Error('POSIX cksum is required');
+const checksum=sum.stdout.trim().split(/\s+/).slice(0,2).join(' ');
+await writeFile(path.join(device,'cached-screen.png'),png,{mode:0o600});
+await writeFile(path.join(device,'task-meta'),`${revision}\n${hits}\n${checksum}\n`,{mode:0o600});
+await writeFile(path.join(device,'utc-offset'),offset+'\n',{mode:0o600});
+console.log('Staged matching screen and metadata. No reminder changed and no USB files copied.');

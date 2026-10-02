@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kindle Note"
+  short_description: "Build and troubleshoot a self-hosted Kindle reminders dashboard"
+  default_prompt: "Use $kindle-note to assess my Kindle and prepare an independent dashboard deployment with a safe rollback plan."

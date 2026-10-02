@@ -1,0 +1,37 @@
+services:
+  backend:
+    build: .
+    restart: unless-stopped
+    init: true
+    read_only: true
+    user: "1000:1000"
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 64
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      APP_ORIGIN: ${APP_ORIGIN:?Set your HTTPS origin}
+    volumes:
+      - ./secrets.json:/run/secrets/kindle.json:ro
+      - ./data:/data
+    networks: [private]
+    logging:
+      driver: json-file
+      options: {max-size: "2m", max-file: "2"}
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      SITE_HOST: ${SITE_HOST:?Set your hostname}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [private]
+networks:
+  private: {}
+volumes:
+  caddy_data: {}
+  caddy_config: {}

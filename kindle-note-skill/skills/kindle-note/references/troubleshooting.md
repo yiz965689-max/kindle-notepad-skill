@@ -1,0 +1,11 @@
+# Evidence-first troubleshooting
+
+1. **Phone saved but device unchanged:** distinguish local draft, server version, downloaded image version, and displayed image. The Upload action confirms only server save. While asleep expect the next periodic sync. While awake inspect version probe connectivity and image fetch result; do not blame touch hardware.
+2. **Second item conflicts after first worked:** a prior POST may have succeeded while the image download timed out. Preserve pending receipt semantics; mark the screen stale, stop accepting old-map taps, fetch a matching new image, then unlock. Never automatically rebase/disable revision checks. `http=200` with curl exit 28 is still an incomplete failed transfer.
+3. **Power button does nothing:** verify `preventScreenSaver` rather than assuming the button is broken. Included fix keeps it at zero while active and resets only `touchScreenSaverTimeout` once per minute. The original firmware exposes these properties, but another model must be probed.
+4. **High battery drain / huge logs:** search `sleep: invalid number`, repeated child failures and polling loops before concluding that all drain is inherent. Never use fractional BusyBox sleep on this device. Check actual CPU duty and controlled battery intervals with unchanged frontlight settings.
+5. **No launch:** read startup guards, incompatible leftovers, required file names and tool permissions. Do not remove a runtime lock without establishing ownership/liveness. A normal restart clears RAM state, but requires the user.
+6. **Debug popup / native page mixed into Note:** stop, collect bounded logs. Do not stop cvm/framework. Historical failures correlated with GUI transitions and USB restoration overlap. Retain PID/start-time checks, stable UI gate, USB checks, and no home launch on abnormal exit.
+7. **Clock freezes asleep:** expected between RTC redraws, not necessarily an RTC error. Ordinary timers do not run during deep suspend. Use event timestamps to distinguish manual vs timer wakes; setting 300 seconds does not imply exactly five-minute wall intervals.
+
+Inspect logs only locally. Report timings/status codes rather than tokens, reminder text, public IP or full serial. A screenshot of an e-ink image does not establish whether the process is alive. For long idle/RTC or low-battery failures, stop rather than bypassing safety checks.

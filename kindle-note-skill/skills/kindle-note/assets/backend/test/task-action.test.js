@@ -1,0 +1,33 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {handle} from '../src/worker.js';
+import {taskLayout,taskHitHeader,screenSVG} from '../src/screen.js';
+test('hit boxes correspond exactly to the visible unfinished rows',()=>{
+ const state={location:{city:'重庆'},tasks:{items:[{id:'a',text:'One',done:false},{id:'b',text:'Done',done:true},{id:'c',text:'Long'.repeat(20),done:false}]}};
+ const rows=taskLayout(state);
+ assert.deepEqual(rows.map(x=>x.item.id),['a','c']);
+ assert.equal(taskHitHeader(state).split(';')[0],'a,32,471,132,551');
+ for(const row of rows)assert.ok(screenSVG(state).includes(`cy="${row.y-14}"`));
+ assert.ok(rows[1].hit[1]-rows[0].hit[3]>=38);
+ assert.ok(screenSVG(state).includes(`M122 ${rows[0].separatorY}H562`));
+});
+test('device completion, undo, replay and stale writes never replace a phone list',async()=>{
+ const data=new Map([['tasks',JSON.stringify({items:[{id:'one',text:'Test',done:false}],revision:1,updated_at:0})]]);
+ const env={ADMIN_TOKEN:'a'.repeat(64),DEVICE_TOKEN:'d'.repeat(64),STORE:{get:async k=>data.has(k)?JSON.parse(data.get(k)):null,put:async(k,v)=>data.set(k,v)}};
+ const send=(path,body,token=env.DEVICE_TOKEN,method='POST')=>handle(new Request('https://example.test'+path,{method,headers:{Authorization:`Bearer ${token}`},body:JSON.stringify(body)}),env);
+ const action={id:'one',done:true,expected_revision:1,operation_id:'operation-00000001'};
+ assert.equal((await send('/v1/task-action',action,env.ADMIN_TOKEN)).status,401);
+ assert.equal((await send('/v1/task-action',{...action,id:'missing'})).status,404);
+ assert.equal((await send('/v1/task-action',action)).status,200);
+ assert.equal(JSON.parse(data.get('tasks')).items[0].done,true);
+ assert.equal((await (await send('/v1/task-action',action)).json()).duplicate,true);
+ assert.equal(JSON.parse(data.get('tasks')).revision,2);
+ assert.equal((await send('/v1/task-action',{...action,done:false})).status,409);
+ const phone={items:[{id:'one',text:'Renamed on phone',done:true},{id:'two',text:'New',done:false}],revision:2};
+ assert.equal((await send('/v1/tasks',phone,env.ADMIN_TOKEN,'PUT')).status,200);
+ assert.equal((await send('/v1/task-action',{...action,operation_id:'operation-00000002',done:false,expected_revision:2})).status,409);
+ assert.equal((await (await send('/v1/task-action',action)).json()).duplicate,true);
+ assert.equal((await send('/v1/task-action',{...action,operation_id:'operation-00000003',done:false,expected_revision:3})).status,200);
+ const stored=JSON.parse(data.get('tasks'));
+ assert.equal(stored.items[0].done,false);assert.equal(stored.items[0].text,phone.items[0].text);assert.equal(stored.items.length,2);
+});
